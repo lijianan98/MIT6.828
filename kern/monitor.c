@@ -59,6 +59,26 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	uint32_t ebp, *p;
+	//we cannot use pointers here since we can't include <stdlib.h>, so we cannot use malloc either
+	struct Eipdebuginfo info ;
+	int result;
+	ebp = read_ebp();
+	cprintf("Stack backtrace:\n");
+	
+	while(ebp != 0) {
+		p = (uint32_t *) ebp;
+		//p+1 is (uint32_t *)ebp + 4, so *(p+1) is eip
+		cprintf("  ebp %x  eip %x  args %08x %08x %08x %08x %08x\n", ebp, *(p+1), *(p+2), *(p+3), *(p+4), *(p+5), *(p+6));
+		
+		result = debuginfo_eip((uintptr_t)(*(p+1)), &info);
+		if(result == 0) {
+			//print("%.s, length, string) print non-null-terminated string, at most length long
+			cprintf("         %s:%d: %.*s+%d\n", info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, (uintptr_t)(*(p+1))-info.eip_fn_addr);
+		}
+		ebp = (*(uint32_t *)ebp);
+	}
+
 	return 0;
 }
 
