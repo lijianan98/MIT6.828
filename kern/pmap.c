@@ -164,6 +164,8 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = (struct Env *)boot_alloc(sizeof(struct Env)*NENV);
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -199,6 +201,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir, UENVS, NENV*sizeof(struct Env), PADDR(envs), PTE_P | PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -597,7 +600,25 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+	uint32_t page_low = (uint32_t)ROUNDDOWN(va, PGSIZE);
+	uint32_t page_high = (uint32_t)ROUNDUP(va+len-1, PGSIZE);
+	int i = 0;
+	
+	// pde_t *env_pgdir;  Kernel virtual address of page dir	this is defined in env.h Env struct
+	// pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create)
+	for(i=page_low; i<=page_high; i+=PGSIZE) {
+		pte_t *pte = pgdir_walk(env->env_pgdir, (void *)i, 0);	// set create = 0 so that it won't allocate pages if it doesn't exist
+		if ((i>=ULIM) || (pte==NULL) || (*pte & (perm | PTE_P))!=(perm | PTE_P)) {
+			if (i<=(uint32_t)va) {
+				user_mem_check_addr = (int)va;		// if i<=va, the first wrong addr should be va because it means rounddown happens and i = page_low
+			}
+			else {
+				user_mem_check_addr = i;
+			}
+			return -E_FAULT;
+		}
+	}
+	
 	return 0;
 }
 

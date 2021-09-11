@@ -13,7 +13,7 @@
  *
  */
 
-// A linear address 'la' has a three-part structure as follows:
+// A linear address 'la' has a three-part structure as follows: 
 //
 // +--------10------+-------10-------+---------12----------+
 // | Page Directory |   Page Table   | Offset within Page  |

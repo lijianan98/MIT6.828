@@ -65,6 +65,59 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	/* You shouldn't call a TRAPHANDLER function from C, but you may
+ 	* need to _declare_ one in C (for instance, to get a function pointer
+ 	* during IDT setup).  You can declare the function with
+ 	*   void NAME(); where NAME is the argument passed to TRAPHANDLER.
+	*/
+
+	// SETGATE arguments: gate, istrap, sel, off, dpl
+	// SETGATE macro will initialize struct Gatedesc gate (Gate descriptors for interrupts and traps)
+	// istrap = 1 trap(exception) gate, = 0 interrupt gate
+	// sel is Code segment selector for interrupt/trap handler
+	// off: Offset in code segment for interrupt/trap handler
+	// dpl: Descriptor Privilege Level - the privilege level required for software to invoke
+	// this interrupt/trap gate explicitly using an int instruction.
+
+	void TRAP_0();
+	void TRAP_1();
+	void TRAP_2();
+	void TRAP_3();
+	void TRAP_4();
+	void TRAP_5();
+	void TRAP_6();
+	void TRAP_7();
+	void TRAP_8();
+	void TRAP_10();
+	void TRAP_11();
+	void TRAP_12();
+	void TRAP_13();
+	void TRAP_14();
+	void TRAP_16();
+	void TRAP_17();
+	void TRAP_18();
+	void TRAP_19();
+	void TRAP_48();
+	SETGATE(idt[0], 0, GD_KT, TRAP_0, 0);
+	SETGATE(idt[1], 0, GD_KT, TRAP_1, 0);
+	SETGATE(idt[2], 0, GD_KT, TRAP_2, 0);
+	SETGATE(idt[3], 0, GD_KT, TRAP_3, 3);     	// be careful here to set dpl = 3
+	SETGATE(idt[4], 0, GD_KT, TRAP_4, 0);
+	SETGATE(idt[5], 0, GD_KT, TRAP_5, 0);
+	SETGATE(idt[6], 0, GD_KT, TRAP_6, 0);
+	SETGATE(idt[7], 0, GD_KT, TRAP_7, 0);
+	SETGATE(idt[8], 0, GD_KT, TRAP_8, 0);
+	SETGATE(idt[10], 0, GD_KT, TRAP_10, 0);
+	SETGATE(idt[11], 0, GD_KT, TRAP_11, 0);
+	SETGATE(idt[12], 0, GD_KT, TRAP_12, 0);
+	SETGATE(idt[13], 0, GD_KT, TRAP_13, 0);
+	SETGATE(idt[14], 0, GD_KT, TRAP_14, 0);
+	SETGATE(idt[16], 0, GD_KT, TRAP_16, 0);
+	SETGATE(idt[17], 0, GD_KT, TRAP_17, 0);
+	SETGATE(idt[18], 0, GD_KT, TRAP_18, 0);
+	SETGATE(idt[19], 0, GD_KT, TRAP_19, 0);
+	SETGATE(idt[48], 0, GD_KT, TRAP_48, 3); 	// be careful here to set dpl = 3, syscall
+	
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -145,6 +198,33 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 
+	if (tf->tf_trapno == 14) {
+		page_fault_handler(tf);
+		// page fault trap
+		return ;
+	}
+	
+	if (tf->tf_trapno == 3) {
+		monitor(tf);
+		return ;
+	}
+
+	// syscall
+	// int32_t syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+	// The system call number will go in %eax, 
+	// and the arguments (up to five of them) will go in %edx, %ecx, %ebx, %edi, and %esi, respectively. 
+	// The kernel passes the return value back in %eax.
+
+	if (tf->tf_trapno == 48) {
+		int32_t ret = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, 
+				      tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+		if(ret < 0){
+			panic("[trap_dispatch] syscall : %e\n", ret);
+		}
+		tf->tf_regs.reg_eax = ret;
+		return ; 
+	}
+
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -203,9 +283,20 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-
 	// LAB 3: Your code here.
-
+	
+	// below explanation is copied from env.c
+	// Set up appropriate initial values for the segment registers.
+	// GD_UD is the user data segment selector in the GDT, and
+	// GD_UT is the user text segment selector (see inc/memlayout.h).
+	// The low 2 bits of each segment register contains the
+	// Requestor Privilege Level (RPL); 3 means user mode.  When
+	// we switch privilege levels, the hardware does various
+	// checks involving the RPL and the Descriptor Privilege Level
+	// (DPL) stored in the descriptors themselves.	
+	if ((tf->tf_cs & 3) == 0) 
+		panic("Page fault happened in kernel mode!");
+	
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 

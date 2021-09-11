@@ -21,6 +21,8 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
+	// from kern/pmap.c: void user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
+	user_mem_assert(curenv, s, len, 0);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -70,11 +72,32 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
+	// panic("syscall not implemented");
 
 	switch (syscallno) {
+	// SYS_cputs = 0,
+	// SYS_cgetc,
+	// SYS_getenvid,
+	// SYS_env_destroy,
+	// NSYSCALLS
+	case SYS_cputs:
+		sys_cputs((char*)a1, (size_t)a2);
+		return 0;
+	case SYS_cgetc:
+		return sys_cgetc();
+	case SYS_getenvid:
+		return sys_getenvid();
+	case SYS_env_destroy:
+		return sys_env_destroy((envid_t)a1);
+
 	default:
 		return -E_INVAL;
 	}
+
+
 }
+
+
+
+
 
