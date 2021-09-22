@@ -1,0 +1,69 @@
+We achtually have three threads: the first one is main thread which uses user stack, the second
+and the third use the stack created in thread_create() func. Because all_thread[] is created as 
+unintialized global variable, it is stored in .bss part.
+
+My answer in uthread_switch.S:
+	.text
+
+/* Switch from current_thread to next_thread. Make next_thread
+ * the current_thread, and set next_thread to 0.
+ * Use eax as a temporary register; it is caller saved.
+ */
+	.globl thread_switch
+thread_switch:
+	/* YOUR CODE HERE */
+	/* save old thread */
+	pushal
+	movl current_thread, %eax
+	movl %esp, (%eax)
+
+	/* restore next thread and make next_thread the current thread */
+	movl next_thread, %ebx
+	movl %ebx, current_thread
+	movl (%ebx), %esp			// update stack pointer
+	popal
+
+	movl $0x0, next_thread
+	ret				/* pop return address from stack */
+  
+  
+  See the diagram below and everything is clear
+                                           .bss
+                                      +-------------+
+                                      |     ...     |
+                               +----> +-------------+
+                               |      |    state    | RUNNABLE
++-----------------+            |      +-------------+
+|    main()       |            |      |    func     | ^ ret address
++-----------------+            |      +-------------+ <--------+
+| thread_init()   |            |      |   thread    |          |
++-----------------+            |      |   switch    |    32 Bytes(8 registers)
+| thread_create() |            |      |  registers  |          |
++-----------------+            |      +-------------+ <-+ sp +-+
+| thread_create() |          Thread 2 |    ...      |
++-----------------+            |      +-------------+
+|thread_schedule()|            |      |     sp      |
++-----------------+            +----> +-------------+
+|     pushal      |            |      |    state    | RUNNING
+|    registers    |            |      +-------------+
++-----------------+ <--+ esp   |      |    func     | <- reg address
+|                 |       +    |      +-------------+ <--------+
+|                 |       |    |      |   thread    |          |
+|                 |       |    |      |   switch    |    32 Bytes(8 registers)
+|                 |       |    |      |  registers  |          |
+|                 |       |    |      +-------------+ <-+ sp +-+
+|                 |       |  Thread 1 |    ...      |
+|                 |       |    |      +-------------+
+|                 |       |    |      |     sp      |
+|                 |       |    +----> +-------------+ <-+ next_thread
+|                 |       |    |      |    state    | RUNNING
+|                 |       |    |      +-------------+
+|                 |       |    |      |     ...     |
++-----------------+       |  Thread 0 |    stack    |
+                          |   (main)  |     ...     |
+                          |    |      +-------------+
+                          |    |      |     sp      | <-------------------+
+                          |    +----> +-------------+ <-+ current_thread  |
+                          |           |     ...     |                     |
+                          |           +-------------+                     |
+                          +-----------------------------------------------
