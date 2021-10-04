@@ -1,0 +1,126 @@
+Part A: Multiprocessor Support and Cooperative Multitasking
+
+Exercise 1    Multiprocessor Support
+We are going to make JOS support "symmetric multiprocessing" (SMP).
+A processor accesses its LAPIC using memory-mapped I/O (MMIO). In MMIO, a portion of physical memory is hardwired to the registers of some I/O devices, 
+so the same load/store instructions typically used to access memory can be used to access device registers. 
+So in this part we only need to use boot_map_region() to map in the space reserved for MMIO
+
+Exercise 2    Application Processor Bootstrap
+mp_init() retrieve information about the multiprocessor system, such as the total number of CPUs, their APIC IDs and the MMIO address of the LAPIC unit
+Control flow: boot_aps() in init.c ---> mpentry.S ---> mp_main() in init.c ---> boot_aps() in init.c
+Question:
+Compare kern/mpentry.S side by side with boot/boot.S. Bearing in mind that kern/mpentry.S is compiled and linked to run above KERNBASE just like everything else in the kernel, what is the purpose of macro MPBOOTPHYS? Why is it necessary in kern/mpentry.S but not in boot/boot.S? In other words, what could go wrong if it were omitted in kern/mpentry.S?
+Hint: recall the differences between the link address and the load address that we have discussed in Lab 1.
+Answer:
+here mpentry.S runs in real mode but the link address is high so we need to use the macro MPBOOTPHYS(s) to make the code runnable and correct.
+
+why do we need to use indirect call here?? (in mpentry.S)
+	# Call mp_main().  (Exercise for the reader: why the indirect call?)
+	movl    $mp_main, %eax
+	call    *%eax
+
+Exercise 3    Per-CPU State and Initialization
+I notice that this part has a lot to do with TSS and TSS descriptor so I searched online and noticed that Intel prepared a TSS for every process yet
+Linux only prepared a TSS for every CPU and stores information such as registers onto the stack pointed by esp0 in TSS and this seems to be the approach
+xv6 employs.
+
+Exercise 4    Per-CPU State and Initialization
+mp_main() will call trap_init_percpu in trap.c and this reminds us that we only need use the macro thiscpu here
+since we know that tr (task registers) identifies TSS, so we also need to update it here using ltr instruction
+remember: << and >> operation should be put in parenthesis
+
+Exercise 5    Locking
+First recall why we need ptable.lock here in xv6:
+One way to think about the structure of the scheduling code is that it arranges to enforce a set of invariants about each process, 
+and holds ptable.lock whenever those invariants are not true.
+One invariant is that if a process is RUNNING, a timer interrupt’s yield must be able to switch away from the process
+Another invariant is that if a process is RUNNABLE, an idle CPU’s scheduler must be able to run it;
+One example of a problem that could arise if ptable.lock were not held during swtch: a different CPU might decide to run the pro-
+cess after yield had set its state to RUNNABLE, but before swtch caused it to stop using its own kernel stack. The result would be two CPUs 
+running on the same stack, which cannot be right. This is because in xv6 one process has only 2 threads (user/kernel) and the user process
+has only one user thread.
+
+Therefore, we also should use kernel lock to prevent race conditions in JOS hen multiple CPUs run kernel code simultaneously.
+
+Question
+It seems that using the big kernel lock guarantees that only one CPU can run the kernel code at a time. 
+Why do we still need separate kernel stacks for each CPU? Describe a scenario in which using a shared kernel stack will go wrong, 
+even with the protection of the big kernel lock.
+
+My Answer
+At first glance, as far as I am concerned, if problems arise when a CPU is running the kernel code, for example, corrupt the stack due to invalid operation, 
+this CPU should yield the process and let other CPU run. 
+Then I searched online and recall the trap and schedule mechanism in lab3 and lab4. If all the CPUs share the same stack, recall the procedure
+macro TRAPHANDLER ---> _alltraps ---> trap() ---> trap_dispatch() ---> ... In kernel mode, when scheduler and switch function are called there will be
+other things to be put onto the stack, which will corrupt other trapframes which are put onto the stack by other CPUs.
+
+Exercise 6    
+Look at the macro in kern/env.h and I noticed 2 usage of symbols # and ## which I didn't know before:
+symbol # is used to convert symbol to string, i.e. 
+#define name(a) #a  
+char *s = name(123);
+symbol ## is used to concatenate 2 symbols, i.e,
+#define name(n) iam##n
+int name(a);  // means int iama
+int name(b);  // means int iamb
+
+Problems I met in this exercise:
+I met with a problem of user_mem_check assertion failure in this exercise and it really cost me much time to debug and I used gdb to trace into 
+user_mem_assert and user_mem_check function and I finally found out that I made a boundary mistake in user_mem_check(). In this function, I originally wrote:
+for(i=page_low; i<=page_high; i+=PGSIZE) {
+  ......
+}
+this is wrong because page_high should be the upper limit of the page range, which means [page_low, page_high] is the aligned pages for argument va and len, so
+I changed it to:
+for(i=page_low; i<page_high; i+=PGSIZE) {
+  ......
+}
+This worked out and I was surprised that this mistake did not affect my make-grade in lab3 and it was really hard to find out.
+
+Finally, conclude the logic, sched_yield() ---> env_run() and env_run will perform context switch as well as pop tf off the stack and this func will not return.
+
+Question
+
+1.In your implementation of env_run() you should have called lcr3(). Before and after the call to lcr3(), your code makes references (at least it should) to the variable e,
+the argument to env_run. Upon loading the %cr3 register, the addressing context used by the MMU is instantly changed. 
+But a virtual address (namely e) has meaning relative to a given address context--the address context specifies the physical address to which the virtual address maps. 
+Why can the pointer e be dereferenced both before and after the addressing switch?
+
+My answer: Just recall that kernel space and user space is separated and kernel program, data is all mapped at higher virtual address above UTOP and the mapping mechanism
+of kernel data is the same: KERNBASE+pa to pa.
+
+2.Whenever the kernel switches from one environment to another, it must ensure the old environment's registers are saved so they can be restored properly later. 
+Why? Where does this happen?
+
+My answer: This is for future use, if we don't save them, how can we restore this environment
+When the old environment goes into kernel mode, its tf will be pushed onto the kernel stack(right?), and it happens in trapentry.S _alltraps.
+
+Exercise 7 System Calls for Environment Creation
+Use this exercise to recall the procedure of system call mechanism.
+inc/dumbfork.c ----------> 
+sys_exofork() Most system call functions are in lib/syscall.c and then call syscall in it, however sys_exofork is inlined in inc/lib.h below:
+// This must be inlined.  Exercise for reader: why?
+static inline envid_t __attribute__((always_inline))
+sys_exofork(void)
+{
+	envid_t ret;
+	asm volatile("int %2" 
+		     : "=a" (ret)
+		     : "a" (SYS_exofork), "i" (T_SYSCALL));
+	return ret;
+}
+Here = means in assembly we cannot retrieve but can change the C variable ret, ret is associated with %ax and it will be put in ret after instruction executed
+this mechanism is rather different from syscall in lib/syscall.c. This inline sys_exofork() will return ret with %eax, so here we set it to 0 in child process.
+I accidentally made a mistake when using type uint8_t and int and it took me a lot of time to debug: uint8_t is unsigned integer with a length of 1 byte (8 bits) 
+so it will convert any pid > 255 to pid % 256, i.e. uint8_t x = 259 and if we print x we will get 3. If we want to use uint8_t, remmeber to add #include <stdint.h>
+
+
+
+
+
+
+
+
+
+
