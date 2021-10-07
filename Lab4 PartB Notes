@@ -31,7 +31,7 @@ See void (*_pgfault_handler)(struct UTrapframe *utf); so at the beginning of pfe
 	call *%eax
 	addl $4, %esp			// pop function argument
   
-My answer for exercies 10 here :
+My answer for exercies 10 here and it is WRONG!!!!:
 	// LAB 4: Your code here.
 	addl $8, %esp			// skip tf_err and fault_va
 	movl 0x20(%esp), %eax		// instruction that is to be executed after ret in stored in eip (0x20+%esp)
@@ -57,7 +57,17 @@ My answer for exercies 10 here :
 
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
-  ret
+  	ret
+	
+  Correct Version!!:
+	// LAB 4: Your code here.
+	addl $8, %esp			// skip tf_err and fault_va
+	movl 0x20(%esp), %eax		// instruction that is to be executed after ret in stored in eip (0x20+%esp)
+	subl $4, 0x28(%esp)		// pay attention here!!! we should update esp stored in utf
+	movl 0x28(%esp), %ebx		// mov trap-time esp into %ebx
+	movl %eax, (%ebx)		// put the return address into the reserved blank space
+	
+	other parts of pfentry.S are the same 
   
 	In exercise 11, when kernel returns to user space, we are running on User Exception Stack and eip = env_pgfault_upcall = func 
   In set_pgfault_handler(void (*handler)(struct UTrapframe *utf)) we will set up the handler in C user library side by setting _pgfault_handler = handler 
@@ -73,4 +83,4 @@ My answer for exercies 10 here :
   Then we switch stacks and restore registers and return to execute where we have left when page fault occurs
   
   Exercise 12
- 
+  
