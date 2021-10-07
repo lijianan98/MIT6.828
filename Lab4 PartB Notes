@@ -1,0 +1,76 @@
+                      <-- UXSTACKTOP
+trap-time esp
+trap-time eflags
+trap-time eip
+trap-time eax       start of struct PushRegs
+trap-time ecx
+trap-time edx
+trap-time ebx
+trap-time esp
+trap-time ebp
+trap-time esi
+trap-time edi       end of struct PushRegs
+tf_err (error code)
+fault_va            <-- %esp when handler is run
+
+Exercise 8 easy
+
+Exercise 9 
+1. how to return and excute on User Exception Stack? change eip and esp in tf
+2. why is there a scratch space reserved? See exercise 10
+
+Exercise 10&11 User-mode Page Fault Entrypoint
+We cannot use jmp since that requires that we load the address into a register, and all registers must have their trap-time values after the return.
+We cannot use ret since we will have wrong value in %esp if we use ret
+As a result, the reserved space in exercise 9 can be used
+
+See void (*_pgfault_handler)(struct UTrapframe *utf); so at the beginning of pfentry.S:
+	// Call the C page fault handler.
+	pushl %esp			// push function argument: pointer to UTF onto the User Exception Stack
+	movl _pgfault_handler, %eax
+	call *%eax
+	addl $4, %esp			// pop function argument
+  
+My answer for exercies 10 here :
+	// LAB 4: Your code here.
+	addl $8, %esp			// skip tf_err and fault_va
+	movl 0x20(%esp), %eax		// instruction that is to be executed after ret in stored in eip (0x20+%esp)
+	leal 0x2c(%esp), %ebx		// the location of the reserved blank space
+	movl %eax, (%ebx)		// put the return address into the reserved blank space
+	subl $4, 0x28(%esp)		// pay attention here!!! we should update esp stored in utf
+
+	// Restore the trap-time registers.  After you do this, you
+	// can no longer modify any general-purpose registers.
+	// LAB 4: Your code here.
+	popal
+
+	// Restore eflags from the stack.  After you do this, you can
+	// no longer use arithmetic operations or anything else that
+	// modifies eflags.
+	// LAB 4: Your code here.
+	addl $4, %esp
+	popfl 
+
+	// Switch back to the adjusted trap-time stack.
+	// LAB 4: Your code here.
+	popl %esp
+
+	// Return to re-execute the instruction that faulted.
+	// LAB 4: Your code here.
+  ret
+  
+	In exercise 11, when kernel returns to user space, we are running on User Exception Stack and eip = env_pgfault_upcall = func 
+  In set_pgfault_handler(void (*handler)(struct UTrapframe *utf)) we will set up the handler in C user library side by setting _pgfault_handler = handler 
+  and in this function we will call sys_env_set_pgfault_upcall(envid_t envid, void *func) by passing _pgfault_upcall as func 
+  In sys_env_set_pgfault_upcall(envid_t envid, void *func) we have set env->env_pgfault_upcall = func
+  pfentry.S will call _pgfault_handler and its entry point is _pgfault_upcall
+  
+  To conclude what we have done so far:
+  1. In user mode we will call set_pgfault_handler() ---> sys_env_set_pgfault_upcall() 
+  (if first time set env_pgfault_upcall = _pgfault_upcall), set _pgfault_handler = handler. 
+  2. After this, when trap occurs in user mode, we trap into page fault handler and set tf->eip to env_pgfault_upcall, which should be _pgfault_upcall
+  3. when we return to user mode , we execute pfentry.S since _pgfault_upcall is the entry point and we will first call _pgfault_handler (the handler set in 1)
+  Then we switch stacks and restore registers and return to execute where we have left when page fault occurs
+  
+  Exercise 12
+ 
