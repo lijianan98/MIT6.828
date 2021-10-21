@@ -1,0 +1,55 @@
+In lib/syscall.c:
+/* 来自一个大佬
+* 在JOS中所有系统调用通过syscall这个函数进行：执行int T_SYSCALL，把函数参数存入若干指定的寄存器
+* 并指定函数返回值返回到寄存器ax中
+* 用第一个参数num来确定到底是哪个系统调用
+* 参数num == SYS_cputs，check == 0，a1 == b->buf， a2 == b->idx，剩下a3、a4、a5都为0
+*/
+static inline int32_t
+syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+{
+    int32_t ret;
+    asm volatile("int %1\n"            //汇编指令模板，%1是占位符，对应后面的T_SYSCALL
+                 : "=a" (ret)          //=表示在汇编里只能改变该C变量的值，而不能取它的值
+                                       //ret值与%ax相联系，即指令执行完后ax的值存入变量ret
+                 : "i" (T_SYSCALL),    //中断向量T_SYSCALL，是立即数
+                   "a" (num),          //输入参数num，指令执行前先将num变量的值存入%ax
+                   "d" (a1),           //输入参数a1，指令执行前先将a1变量的值存入%dx
+                   "c" (a2),           //参数a2存入%cx
+                   "b" (a3),           //参数a3存入%bx
+                   "D" (a4),           //参数a4存入%di
+                   "S" (a5),           //参数a5存入%si
+                 : "cc", "memory");    //向gcc声明在这条汇编语言执行后，标志寄存器eflags和内存可能发生改变
+                                       //加入“memory”，告诉GCC内存已经被修改，GCC得知这个信息后， 
+                                       //就会在这段指令之前，插入必要的指令将前面因为优化缓存到寄存器中
+                                       //的变量值先写回内存，如果以后又要使用这些变量再重新读取。
+    if(check && ret > 0)
+        panic("syscall %d returned %d (> 0)", num, ret);
+    return ret;
+}
+
+As a result, this sycall function will execute int T_SYSCALL, and we have used SETGATE() in kern/trap.c, see explanations below:
+	/* You shouldn't call a TRAPHANDLER function from C, but you may
+ 	* need to _declare_ one in C (for instance, to get a function pointer
+ 	* during IDT setup).  You can declare the function with
+ 	*   void NAME(); where NAME is the argument passed to TRAPHANDLER.
+	*/
+	// SETGATE arguments: gate, istrap, sel, off, dpl
+	// SETGATE macro will initialize struct Gatedesc gate (Gate descriptors for interrupts and traps)
+	// istrap = 1 trap(exception) gate, = 0 interrupt gate
+	// sel is Code segment selector for interrupt/trap handler
+	// off: Offset in code segment for interrupt/trap handler
+	// dpl: Descriptor Privilege Level - the privilege level required for software to invoke
+	// this interrupt/trap gate explicitly using an int instruction.
+  
+  Then, int T_SYSCALL will lead to execute TRAPHANDLER() or TRAPHANDLER_NOEC() we set up in .text part in trapentry.S 
+  这里应该是段寻址机制相关，for the off argument in SETGATE we pass a function pointer.
+  
+  Then, we push relevant things (esp ss eip cs errono are pushed by CPU automatically) onto the stack (kernel stack)
+  jump tp _alltraps push other things to formulate Trapframe structure.
+  
+  Then, _alltraps call trap() (comes from user or kernel ?? e.g. page fault) 
+  Then, trap() calls trap_dispatch()
+  Then, blabla
+  return to user mode, pop the Trapframe
+
