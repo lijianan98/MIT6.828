@@ -83,4 +83,10 @@ My answer for exercies 10 here and it is WRONG!!!!:
   Then we switch stacks and restore registers and return to execute where we have left when page fault occurs
   
   Exercise 12 Implementing Copy-on-Write Fork
+  https://www.cnblogs.com/gatsby123/p/9838304.html this link contains a picture of the mappings set up until lab3 finished, see it
+  
+  
+  
+  
+  
   
