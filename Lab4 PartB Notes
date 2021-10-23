@@ -84,6 +84,8 @@ My answer for exercies 10 here and it is WRONG!!!!:
   
   Exercise 12 Implementing Copy-on-Write Fork
   https://www.cnblogs.com/gatsby123/p/9838304.html this link contains a picture of the mappings set up until lab3 finished, see it
+  print some address in my program and find that: kern_pgdir is at 0xf026f000, end is at 0xf026e008, which means PA is 0x0026f000 and 0x26e008.
+  I will summarize how uvpt[PGNUM(addr)] helps check PTE entry for va "addr" in another file "JOS UVPT page tables".
   
   
   
