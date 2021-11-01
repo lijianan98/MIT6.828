@@ -87,8 +87,9 @@ My answer for exercies 10 here and it is WRONG!!!!:
   print some address in my program and find that: kern_pgdir is at 0xf026f000, end is at 0xf026e008, which means PA is 0x0026f000 and 0x26e008.
   I will summarize how uvpt[PGNUM(addr)] helps check PTE entry for va "addr" in another file "JOS UVPT page tables".
   
-  
-  
+  Question mentioned on the website:
+  Note: The ordering here (i.e., marking a page as COW in the child before marking it in the parent) actually matters! Can you see why? 
+  Try to think of a specific case where reversing the order could cause trouble. 
   
   
   
