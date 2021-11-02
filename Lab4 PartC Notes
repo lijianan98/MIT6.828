@@ -1,0 +1,13 @@
+Part C: Preemptive Multitasking and Inter-Process communication (IPC)
+Exercise 13
+While an NMI handler is executing, the processor ignores further interrupt signals at the NMI pin until the next IRET instruction is executed.
+
+The IF (interrupt-enable flag) controls the acceptance of external interrupts signalled via the INTR pin. 
+When IF=0, INTR interrupts are inhibited; when IF=1, INTR interrupts are enabled. As with the other flag bits, 
+the processor clears IF in response to a RESET signal. The instructions CLI and STI alter the setting of IF.
+
+CLI (Clear Interrupt-Enable Flag) and STI (Set Interrupt-Enable Flag) explicitly alter IF (bit 9 in the flag register). 
+These instructions may be executed only if CPL <= IOPL. A protection exception occurs if they are executed when CPL > IOPL.
+
+Exericise 14 Handling Clock Interrupts
+
