@@ -53,7 +53,9 @@ At first glance, as far as I am concerned, if problems arise when a CPU is runni
 this CPU should yield the process and let other CPU run. 
 Then I searched online and recall the trap and schedule mechanism in lab3 and lab4. If all the CPUs share the same stack, recall the procedure
 macro TRAPHANDLER ---> _alltraps ---> trap() ---> trap_dispatch() ---> ... In kernel mode, when scheduler and switch function are called there will be
-other things to be put onto the stack, which will corrupt other trapframes which are put onto the stack by other CPUs.
+other things to be put onto the stack, which will corrupt other trapframes which are put onto the stack by other CPUs. Notice that every CPU maintains its own
+set of registers, and the lock_kernel() function is acquired in trap() (e.g. CPU0), but when traps happened in used mode in other CPU(say CPU1) it will push 
+register values onto the same stack in _alltraps and TRAPHANDLER which happened before the lock is required. As a result, the stack will be corrupted.
 
 Exercise 6    
 Look at the macro in kern/env.h and I noticed 2 usage of symbols # and ## which I didn't know before:
