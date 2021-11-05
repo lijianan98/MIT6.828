@@ -1,4 +1,5 @@
 Part C: Preemptive Multitasking and Inter-Process communication (IPC)
+
 Exercise 13
 While an NMI handler is executing, the processor ignores further interrupt signals at the NMI pin until the next IRET instruction is executed.
 
@@ -9,5 +10,16 @@ the processor clears IF in response to a RESET signal. The instructions CLI and 
 CLI (Clear Interrupt-Enable Flag) and STI (Set Interrupt-Enable Flag) explicitly alter IF (bit 9 in the flag register). 
 These instructions may be executed only if CPL <= IOPL. A protection exception occurs if they are executed when CPL > IOPL.
 
-Exericise 14 Handling Clock Interrupts
+Exercise 14 Handling Clock Interrupts
+Easy
+
+Exercise 15 Inter-Process communication (IPC)
+It's better to be called Inter_environment communication in JOS
+We've been focusing on the isolation aspects, now we should pay attention to IPC.
+There are many models for interprocess communication, e.g. the Unix pipe model.
+
+You will implement two system calls, sys_ipc_recv and sys_ipc_try_send. Then you will implement two library wrappers ipc_recv and ipc_send.
+
+
+
 
