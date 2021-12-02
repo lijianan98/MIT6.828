@@ -1,4 +1,4 @@
-In lib/syscall.c:
+1. In lib/syscall.c:
 /* 来自一个大佬
 * 在JOS中所有系统调用通过syscall这个函数进行：执行int T_SYSCALL，把函数参数存入若干指定的寄存器
 * 并指定函数返回值返回到寄存器ax中
@@ -28,7 +28,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
     return ret;
 }
 
-As a result, this sycall function will execute int T_SYSCALL, and we have used SETGATE() in kern/trap.c, see explanations below:
+2. As a result, this sycall function will execute int T_SYSCALL, and we have used SETGATE() in kern/trap.c, see explanations below:
 	/* You shouldn't call a TRAPHANDLER function from C, but you may
  	* need to _declare_ one in C (for instance, to get a function pointer
  	* during IDT setup).  You can declare the function with
@@ -42,14 +42,16 @@ As a result, this sycall function will execute int T_SYSCALL, and we have used S
 	// dpl: Descriptor Privilege Level - the privilege level required for software to invoke
 	// this interrupt/trap gate explicitly using an int instruction.
   
-  Then, int T_SYSCALL will lead to execute TRAPHANDLER() or TRAPHANDLER_NOEC() we set up in .text part in trapentry.S 
+ 3. Then, int T_SYSCALL will lead to execute TRAPHANDLER() or TRAPHANDLER_NOEC() we set up in .text part in trapentry.S 
   这里应该是段寻址机制相关，for the off argument in SETGATE we pass a function pointer.
   
-  Then, we push relevant things (esp ss eip cs errono are pushed by CPU automatically) onto the stack (kernel stack)
+ 4. Then, we push relevant things (esp ss eip cs errono are pushed by CPU automatically) onto the stack (kernel stack)
   jump tp _alltraps push other things to formulate Trapframe structure.
   
-  Then, _alltraps call trap() (comes from user or kernel ?? e.g. page fault) 
-  Then, trap() calls trap_dispatch()
-  Then, blabla
-  return to user mode, pop the Trapframe
+ 5. Then, _alltraps call trap(struct Trapframe *tf) (comes from user or kernel ?? e.g. page fault) to cosntruct a Trapframe on the stack.
+  Also, we will pass a parameter (pushl %esp) as tf's value in _alltraps.
+ 6. Then, trap() function will handle some stuff such as lock. Because we trap into kernel from user mode, trap() will set curenv->env_tf = *tf so that 
+ when we return to user mode, we actually pop curenv->env_tf rather than things on the stack. call trap_dispatch(). That's why we can fork a child and 
+ make it seems to return 0 by setting env_tf.tf_regs.reg_eax = 0. Recall that syscall has ensured that return value is %eax's value.
+ 7. Then, blabla return to user mode, pop the Trapframe
 
