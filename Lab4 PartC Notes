@@ -20,6 +20,11 @@ There are many models for interprocess communication, e.g. the Unix pipe model.
 
 You will implement two system calls, sys_ipc_recv and sys_ipc_try_send. Then you will implement two library wrappers ipc_recv and ipc_send.
 
-
+To sum up, We can use user program sendpage.c to analyse the IPC mechanism from a high level. In sendpage.c, we will use the fork we implemented 
+to create child and make parent and child send information to each other:
+1. ipc_recv() calls sys_ipc_try_send => set relevant fields in Env struct, particularly set target env's state to ENV_RUNNABLE so that it can be 
+scheduled => most importantly, set e->env_tf.tf_regs.reg_eax = 0. The last step is because we wish to make target env return 0 when returning from
+ipc_recv() function. I have analyzed the process of syscall in another note
+2. ipc_send() calls sys_ipc_recv => if pg is valid, set state to ENV_NOT_RUNNABLE => call sys_yield to give up the CPU
 
 
